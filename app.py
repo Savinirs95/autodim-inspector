@@ -14,17 +14,45 @@ if uploaded_file is not None:
     if st.button("Extract Dimensions"):
 
         doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-        text = ""
+        text = extract_text_with_ocr(doc)
 
         for page in doc:
-            text += page.get_text()
+            import pytesseract
+import cv2
+import numpy as np
+from PIL import Image
+
+def extract_text_with_ocr(doc):
+    full_text = ""
+
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+
+        # Convert PDF page to image
+        pix = page.get_pixmap(dpi=300)
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+        # Convert to OpenCV format
+        img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+        # Improve image for OCR
+        gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+
+        # OCR
+        text = pytesseract.image_to_string(thresh)
+        full_text += text
+
+    return full_text
+``
 
         # Dimension patterns
         patterns = [
-            r"Ø\d+\.?\d*",
-            r"R\d+\.?\d*",
-            r"\d+\.?\d*\s?±\d+\.?\d*",
-            r"\d+\.\d+"
+            
+r"R\d+\.?\d*",      # Radius
+    r"\d+°",            # Angle
+    r"\d+\.?\d*"        # Linear values
+
         ]
 
         dimensions = []
@@ -34,10 +62,16 @@ if uploaded_file is not None:
         dimensions = list(set(dimensions))
 
         df = pd.DataFrame({
-            "S.No": range(1, len(dimensions) + 1),
-            "Specified Dimension": dimensions,
-            "Actual Dimension": "",
-            "Status": ""
+            "
+ "Balloon No": range(1, len(dimensions) + 1),
+    "Dimension Type": [
+        "Radius" if "R" in d else "Angle" if "°" in d else "Linear"
+        for d in dimensions
+    ],
+    "Specified Dimension": dimensions,
+    "Actual Dimension": "",
+    "Status": ""
+
         })
 
         st.success("✅ Dimensions extracted successfully")
